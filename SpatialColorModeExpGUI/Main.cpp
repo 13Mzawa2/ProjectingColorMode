@@ -2,6 +2,8 @@
 # include <Siv3D.hpp>
 #include "TestAreas.h"
 
+String inifile = L"data.ini";
+
 void SetGUI(GUI &gui)
 {
 	gui.style.borderRadius = 0.0;
@@ -12,6 +14,9 @@ void SetGUI(GUI &gui)
 	gui.addln(L"BackgroundText", GUIText::Create(L"Background: (0.5,0.5,0.5)", 300));
 	gui.addln(L"TestText", GUIText::Create(L"Test: (0.5,0.5,0.5)", 300));
 	gui.addln(L"ControllerState", GUIText::Create(L"Controller: none"));
+	gui.add(L"Counter", GUIText::Create(L"Terms: 0"));
+	gui.addln(L"SaveButton", GUIButton::Create(L"Save"));
+	gui.addln(L"ClearButton", GUIButton::Create(L"Clear"));
 }
 
 void updateColor(ColorF &c, XInput controller)
@@ -27,6 +32,20 @@ void updateColor(ColorF &c, XInput controller)
 	c.g += dY*c.g;
 	c.b += dY*c.b;
 
+}
+
+void saveCSV(std::vector<ColorF> backs, std::vector<ColorF> tests)
+{
+	if (const auto save = Dialog::GetSave({ ExtensionFilter::CSV }))
+	{
+		CSVWriter csv(save.value());
+		csv.writeRow(L"count",L"back_R", L"back_G", L"back_B", L"test_R", L"test_G", L"test_B");
+		for (int i=0; i < backs.size(); i++) {
+			auto b = backs[i], t = tests[i];
+			csv.writeRow(i, b.r, b.g, b.b, t.r, t.g, t.b);
+		}
+
+	}
 }
 
 void Main()
@@ -60,9 +79,14 @@ void Main()
 	TestAreas ts(proPos + Point(500, 370), Size(72, 72));
 	//	背景
 	ColorF background(0.5, 0.5, 0.5);
+	int counter = 0;
+
+	//	実験結果保存用
+	std::vector<ColorF> backlights;
+	std::vector<ColorF> testlights;
 
 	//	iniファイルがあれば読込
-	INIReader inir(L"data.ini");
+	INIReader inir(inifile);
 	if (inir) {
 		std::vector<Vec2> corners{
 			inir.get<Vec2>(L"Corners.c0"),
@@ -90,13 +114,32 @@ void Main()
 			}
 			//	トグルスイッチ切り替え
 			if (controller.buttonY.clicked) {
-				gui.radioButton(L"ColorSwitch").checked(1u);
+				gui.radioButton(L"ColorSwitch").check(0u);	//	test
 			}
 			if (controller.buttonX.clicked) {
-				gui.radioButton(L"ColorSwitch").checked(0u);
+				gui.radioButton(L"ColorSwitch").check(1u);	//	background
+			}
+			//	結果の記録
+			if (controller.buttonStart.clicked) {
+				backlights.push_back(background);
+				testlights.push_back(ts.color);
+				counter++;
+				gui.text(L"Counter").text = L"Terms: " + Format(counter);
+				//	テスト光のリセット
+				ts.color = background * 0.4; ts.color.a = 1.0;
 			}
 		}
-
+		//	記録の保存
+		if (gui.button(L"SaveButton").pushed) {
+			saveCSV(backlights, testlights);
+		}
+		//	記録の消去
+		if (gui.button(L"ClearButton").pushed) {
+			backlights.clear();
+			testlights.clear();
+			counter = 0;
+			gui.text(L"Counter").text = L"Terms: " + Format(counter);
+		}
 		//	ColorPaletteでの色変化
 		if (palette_gui.colorPalette(L"ColorPalette").pressed) {
 			if (gui.radioButton(L"ColorSwitch").checked(0u)) {
@@ -123,12 +166,13 @@ void Main()
 		ts.draw();
 		Graphics::SetBackground(background);
 	}
+
 	//	終了時に現在の設定をiniファイルに保存
-	INIWriter ini(L"data.ini");
-	ini.write(L"Corners", L"c0", ts.corners[0]);
-	ini.write(L"Corners", L"c1", ts.corners[1]);
-	ini.write(L"Corners", L"c2", ts.corners[2]);
-	ini.write(L"Corners", L"c3", ts.corners[3]);
-	ini.write(L"Color", L"back", background);
-	ini.write(L"Color", L"test", ts.color);
+	INIWriter iniw(L"data.ini");
+	iniw.write(L"Corners", L"c0", ts.corners[0]);
+	iniw.write(L"Corners", L"c1", ts.corners[1]);
+	iniw.write(L"Corners", L"c2", ts.corners[2]);
+	iniw.write(L"Corners", L"c3", ts.corners[3]);
+	iniw.write(L"Color", L"back", background);
+	iniw.write(L"Color", L"test", ts.color);
 }
