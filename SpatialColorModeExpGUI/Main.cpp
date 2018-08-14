@@ -1,13 +1,17 @@
 ﻿
-# include <Siv3D.hpp>
+#include "TextureNoise.h"
 #include "TestAreas.h"
+# include <Siv3D.hpp>
 
 String inifile = L"data.ini";
+String bgpath = L"momen.jpg";
+String texpath = L"Example/Ground.jpg";
 
 void SetGUI(GUI &gui)
 {
 	gui.style.borderRadius = 0.0;
 	gui.style.borderColor = Palette::Darkgray;
+	gui.style.background.color = Palette::Darkgray;
 	
 	gui.setTitle(L"Settings");
 	gui.addln(L"ColorSwitch", GUIRadioButton::Create({L"Test", L"Background"}, 0u, true));
@@ -80,6 +84,9 @@ void Main()
 	//	背景
 	ColorF background(0.5, 0.5, 0.5);
 	int counter = 0;
+	Texture tex(texpath);
+	DynamicTexture tex_bg;
+	tex_bg.tryFill(TextureNoise::generate(proSize));
 
 	//	実験結果保存用
 	std::vector<ColorF> backlights;
@@ -162,9 +169,21 @@ void Main()
 			+ L")";
 
 		//	刺激の作成
-		ts.update();
-		ts.draw();
 		Graphics::SetBackground(background);
+		ts.update();
+		//	ステンシルバッファへの書き込み（マスク領域の作成）
+		Graphics2D::SetStencilState(StencilState::Replace);
+		Graphics2D::SetStencilValue(1);
+		ts.draw();
+		Graphics2D::SetStencilState(StencilState::Default);
+		//	基準刺激
+		Graphics2D::SetBlendState(BlendState::Additive);
+		//Quad(ts.corners[0], ts.corners[1], ts.corners[2], ts.corners[3])(tex).draw();
+		ts.draw();
+		//	マスク領域のみテクスチャを加算
+		Graphics2D::SetStencilState(StencilState::Test(StencilFunc::Equal));
+		tex_bg.draw(proPos);
+		
 	}
 
 	//	終了時に現在の設定をiniファイルに保存

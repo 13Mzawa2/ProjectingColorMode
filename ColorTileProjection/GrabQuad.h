@@ -2,7 +2,7 @@
 
 #include <Siv3D.hpp>
 
-class TestAreas
+class GrabQuad
 {
 private:
 	std::vector<Quad> quads;
@@ -10,10 +10,10 @@ private:
 
 public:
 	std::vector<Vec2> corners;
-	ColorF color = ColorF(0.5,0.5,0.5);
+	ColorF color = ColorF(0.5, 0.5, 0.5);
 
-	TestAreas() = default;
-	explicit TestAreas(Point p, Size sz) {
+	GrabQuad() = default;
+	explicit GrabQuad(Point p, Size sz) {
 		init(p, sz);
 	}
 	void init(Point p, Size sz)
@@ -21,7 +21,7 @@ public:
 		corners = std::vector<Vec2>{ p, p + Vec2{ sz.x, 0 }, p + sz, p + Vec2{ 0,sz.y } };
 		makeQuads();
 	}
-	void init(std::vector<Vec2> corners_) 
+	void init(std::vector<Vec2> corners_)
 	{
 		corners = corners_;
 		makeQuads();
