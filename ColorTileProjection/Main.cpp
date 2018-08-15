@@ -2,6 +2,7 @@
 # include <Siv3D.hpp>
 #include "GrabQuad.h"
 #include "TileTexture.h"
+#include <codecvt>
 
 //	Window parameters
 const Size proSize(1280, 800);
@@ -13,16 +14,36 @@ const Point proPos(menuWidth, 0);
 
 String inifile = L"data.ini";
 
-void readCalibCSV()
+void readCalibCSV(std::vector<double> &BGR_vals, std::array<std::vector<cv::Vec3d>, 3> &bgr_xyLs)
 {
+	if (const auto open = Dialog::GetOpen({ ExtensionFilter::CSV })) {
+		CSVReader csv(open.value());
+		if (csv.isOpened()) {
+			BGR_vals.clear();
+			for (int j = 0; j <= csv.rows - 3; j++) {
+				BGR_vals.push_back(std::floor(j * 255.0 / double(csv.rows - 3)));
+			}
+			for (int i = 0; i < 3; i++) {
+				bgr_xyLs[i].clear();
+				for (int j = 0; j <= csv.rows - 3; j++) {
+					cv::Vec3d xyL(
+						csv.get<double>(j, (2 - i) * 3 + 0),
+						csv.get<double>(j, (2 - i) * 3 + 1),
+						csv.get<double>(j, (2 - i) * 3 + 2));
+					bgr_xyLs[i].push_back(xyL);
+				}
+			}
 
+		}
+	}
 }
 
 void makeMenu(GUI &gui)
 {
 	gui.setTitle(L"main menu");
 	gui.addln(L"calib_button", GUIButton::Create(L"Load projector calib data"));
-
+	gui.add(L"calib_read_button", GUIButton::Create(L"Load calib xml"));
+	gui.addln(L"calib_write_button", GUIButton::Create(L"Save calib xml"));
 }
 
 void Main()
@@ -56,11 +77,29 @@ void Main()
 
 	while (System::Update())
 	{
+		//	gui events
+		if (gui.button(L"calib_button").pushed) {
+			readCalibCSV(tile.BGR_vals, tile.bgr_xyLs);
+			tile.calib.fit(tile.BGR_vals, tile.bgr_xyLs);
+		}
+		if (gui.button(L"calib_read_button").pushed) {
+			if (const auto open = Dialog::GetOpen({ ExtensionFilter::XML })) {
+				std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+				auto str = converter.to_bytes(open.value().c_str());
+				tile.calib.read(str);
+			}
+		}
+		if (gui.button(L"calib_write_button").pushed) {
+			if (const auto save = Dialog::GetSave({ ExtensionFilter::XML })) {
+				std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+				auto str = converter.to_bytes(save.value().c_str());
+				tile.calib.write(str);
+			}
+		}
 
 		//	update contents
 		gq.update();
 		Quad quad(gq.corners[0], gq.corners[1], gq.corners[2], gq.corners[3]);
-
 		//	draw contents
 		prolight.draw(ColorF(1., 1., 1.));
 		quad.draw(Palette::Lime);

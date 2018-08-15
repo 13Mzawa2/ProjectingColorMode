@@ -98,5 +98,9 @@ namespace cvutil
 
 		//	モデル予測値ベクトル
 		void XYZs_est(std::vector<cv::Vec3d> BGRs, std::vector<cv::Vec3d> &XYZs);
+
+		// ファイルへ保存・読込
+		void read(cv::String path);
+		void write(cv::String path);
 	};
 }

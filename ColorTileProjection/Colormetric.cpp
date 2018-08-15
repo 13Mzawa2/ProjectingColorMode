@@ -231,7 +231,8 @@ void cvutil::CamColorCalibrator::read(cv::String path)
 	cv::FileStorage fs(path, cv::FileStorage::READ);
 	fs["param"] >> params;
 	fs["white"] >> whiteXYZ;
-	
+	fs.release();
+
 	calibrated = true;
 }
 
@@ -241,6 +242,7 @@ void cvutil::CamColorCalibrator::write(cv::String path)
 	cv::FileStorage fs(path, cv::FileStorage::WRITE);
 	fs << "param" << params;
 	fs << "white" << whiteXYZ;
+	fs.release();
 }
 
 double cvutil::CamColorCalibrator::CostFunciton::calc(const double * x) const
@@ -264,6 +266,8 @@ double cvutil::CamColorCalibrator::CostFunciton::calc(const double * x) const
 
 double cvutil::DisplayColorCalibrator::fit(std::vector<double> BGR_vals, std::array<std::vector<cv::Vec3d>, 3> xyLs)
 {
+	if (BGR_vals.empty() || xyLs.empty()) return -1;
+
 	//	step 1: xyL -> XYZ, XYZバックライト差分, 差分のxyL
 	std::array<std::vector<cv::Vec3d>, 3> XYZs, XYZs_sub, xyLs_sub;
 	offset = Colormetric::cvtxyY2XYZ(xyLs[0][0]);
@@ -286,7 +290,7 @@ double cvutil::DisplayColorCalibrator::fit(std::vector<double> BGR_vals, std::ar
 		for (auto xyL : xyLs_sub[i]) {
 			xy_mean += cv::Vec2d(xyL[0],xyL[1]);
 		}
-		xy_bgr[i] = xy_mean;
+		xy_bgr[i] = cv::Vec2d(xy_mean[0] / xyLs_sub[i].size(), xy_mean[1] / xyLs_sub[i].size());
 	}
 
 	//	BGR -> bgr
@@ -299,23 +303,25 @@ double cvutil::DisplayColorCalibrator::fit(std::vector<double> BGR_vals, std::ar
 	//	step 3: 対数をとって線形最小二乗法で解く
 	//		L = L_max * bgr^gamma
 	//		->  ln(L) = ln(L_max) + gamma*ln(bgr)
-	//		->  [y] = [x,1] * [L_max, gamma]^t
+	//		->  [y] = [1, x] * [ln(L_max), gamma]^t
 	for (auto i = 0; i < 3; i++) {
 		cv::Mat my(bgrs.size(), 1, CV_64FC1);
 		cv::Mat mx(bgrs.size(), 2, CV_64FC1);
 		cv::Mat ma;
 		//	代入
 		for (int j = 0; j < bgrs.size(); j++) {
-			auto L = xyLs_sub[i][j][3];
+			auto L = xyLs_sub[i][j][2];
 			my.at<double>(j) = std::log(std::max(L, 1e-4));
-			mx.at<double>(j, 0) = std::log(bgrs[j]);
-			mx.at<double>(j, 1) = 1.0;
+			mx.at<double>(j, 0) = 1.0;
+			mx.at<double>(j, 1) = std::log(bgrs[j]);
 		}
 		//	線形最小二乗法
 		cv::solve(mx, my, ma, cv::DECOMP_SVD);
-		Lmax[i] = ma.at<double>(0);
+		Lmax[i] = std::exp(ma.at<double>(0));
 		gamma[i] = ma.at<double>(1);
 	}
+	
+	calibrated = true;
 
 	return 0.0;
 }
@@ -327,4 +333,32 @@ void cvutil::DisplayColorCalibrator::XYZs_est(std::vector<cv::Vec3d> BGRs, std::
 		auto XYZ = Colormetric::cvtDisplayBGR2XYZ(BGR, gamma, Lmax, offset, M);
 		XYZs.push_back(XYZ);
 	}
+}
+
+void cvutil::DisplayColorCalibrator::read(cv::String path)
+{
+	cv::FileStorage fs(path, cv::FileStorage::READ);
+	fs["gamma"] >> gamma;
+	fs["Lmax"] >> Lmax;
+	cv::FileNode node = fs["xy"];
+	node["B"] >> xy_bgr[0];
+	node["G"] >> xy_bgr[1];
+	node["R"] >> xy_bgr[2];
+	fs["offset"] >> offset;
+	fs.release();
+
+	calibrated = true;
+}
+
+void cvutil::DisplayColorCalibrator::write(cv::String path)
+{
+	cv::FileStorage fs(path, cv::FileStorage::WRITE);
+	fs << "gamma" << gamma;
+	fs << "Lmax" << Lmax;
+	fs << "xy" << "[" 
+		<< "B" << xy_bgr[0]
+		<< "G" << xy_bgr[1]
+		<< "R" << xy_bgr[2] << "]";
+	fs << "offset" << offset;
+	fs.release();
 }

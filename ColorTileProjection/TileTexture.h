@@ -11,7 +11,8 @@ public:
 
 	//	color calibration data
 	//	(b1(x,y,L),b2(x,y,L),...),(g1(x,y,L),...),(r1(x,y,L),...)
-	std::array<std::vector<cv::Vec3d>, 3> bgr_xyL;
+	std::array<std::vector<cv::Vec3d>, 3> bgr_xyLs;
+	std::vector<double> BGR_vals;
 	cvutil::DisplayColorCalibrator calib;
 };
 
