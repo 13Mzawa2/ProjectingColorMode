@@ -95,6 +95,7 @@ namespace cvutil
 		//	モデル式
 		cv::Mat cvtMat() { return Colormetric::cvtMatYBGR2XYZ(xy_bgr); };
 		cv::Vec3d XYZ_est(cv::Vec3d BGR) { return Colormetric::cvtDisplayBGR2XYZ(BGR, gamma, Lmax, offset, cvtMat()); };
+		cv::Vec3d BGR_est(cv::Vec3d XYZ) { return Colormetric::cvtXYZ2DisplayBGR(XYZ, gamma, Lmax, offset, cvtMat().inv()); };
 
 		//	モデル予測値ベクトル
 		void XYZs_est(std::vector<cv::Vec3d> BGRs, std::vector<cv::Vec3d> &XYZs);

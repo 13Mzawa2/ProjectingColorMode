@@ -67,7 +67,7 @@ cv::Vec3d cvutil::Colormetric::cvtXYZ2DisplayBGR(cv::Vec3d XYZ, cv::Vec3d gamma,
 	//	BGR
 	cv::Vec3d BGR;
 	for (int i = 0; i < 3; i++) {
-		BGR[i] = 255. * pow(YBGR[i] - offset[i], 1. / gamma[i]);
+		BGR[i] = 255. * pow((YBGR[i] - offset[i])/Lmax[i], 1. / gamma[i]);
 	}
 	return BGR;
 }
@@ -340,11 +340,11 @@ void cvutil::DisplayColorCalibrator::read(cv::String path)
 	cv::FileStorage fs(path, cv::FileStorage::READ);
 	fs["gamma"] >> gamma;
 	fs["Lmax"] >> Lmax;
+	fs["offset"] >> offset;
 	cv::FileNode node = fs["xy"];
 	node["B"] >> xy_bgr[0];
 	node["G"] >> xy_bgr[1];
 	node["R"] >> xy_bgr[2];
-	fs["offset"] >> offset;
 	fs.release();
 
 	calibrated = true;
@@ -355,10 +355,10 @@ void cvutil::DisplayColorCalibrator::write(cv::String path)
 	cv::FileStorage fs(path, cv::FileStorage::WRITE);
 	fs << "gamma" << gamma;
 	fs << "Lmax" << Lmax;
-	fs << "xy" << "[" 
+	fs << "xy" << "{" 
 		<< "B" << xy_bgr[0]
 		<< "G" << xy_bgr[1]
-		<< "R" << xy_bgr[2] << "]";
+		<< "R" << xy_bgr[2] << "}";
 	fs << "offset" << offset;
 	fs.release();
 }
